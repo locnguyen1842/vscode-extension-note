@@ -10,41 +10,50 @@ const vscode = require('vscode');
  */
 async function activate(context) {
 	console.log('Congratulations, your extension "sample" is now active!');
+
+	const storageStruct = {
+		'/Users/Mac': {
+			1: {
+				2: {
+					
+				}	
+			}
+		}
+	}
 	
 	const storage = context.workspaceState
+	let editor = vscode.window.activeTextEditor
 
 	let clearStorage = vscode.commands.registerCommand('sample.clearStorage', function () {
-		const editor = vscode.window.activeTextEditor;
-
 		storage.keys().forEach((key) => {
 			storage.update(key, undefined)
 		})
+
+		if(! editor) {
+			return
+		}
 
 		editor.setDecorations(noteDecorationType, []);
 	});
 
 	let disposable = vscode.commands.registerCommand('sample.noteSelection', function () {
-		const editor = vscode.window.activeTextEditor;
+		if(!editor) {
+			return
+		}
+		
 		const editorFileName = editor.document.fileName
 
-		if (editor) {
-			const selection = editor.selection;
-			let fileLines = storage.get(editorFileName, {})
+		const selection = editor.selection
 
-			if(! selection.isSingleLine) {
-				return
-			}
-
-			const selectionStorageKey = `${selection.start.line}:${selection.start.character}|${selection.end.character}`
-
-			fileLines[selectionStorageKey] = (new Date()).toISOString()
-
-			storage.update(editorFileName, fileLines)
+		if(! selection.isSingleLine) {
+			return
 		}
 
-		triggerHighlightNotedLines()
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Text stored');
+		const message = (new Date()).toISOString()
+
+		addNoteAtRange(editorFileName, selection, message)
+		
+		triggerHighlightNoted()
 	});
 
 	let isObject = function(obj) {
@@ -77,8 +86,11 @@ async function activate(context) {
 		}
 	})
 
-	const triggerHighlightNotedLines = function() {
-		const editor = vscode.window.activeTextEditor
+	const triggerHighlightNoted = function() {
+		if(!editor) {
+			return;
+		}
+
 		const editorFileName = editor.document.fileName
 
 		let fileNotedLines = storage.get(editorFileName)
@@ -91,6 +103,14 @@ async function activate(context) {
 
 				const startPos = new vscode.Position(line, start)
 				const endPos = new vscode.Position(line, end)
+				const range = new vscode.Range(startPos, endPos)
+
+				console.log(editor.document.getText(range))
+
+				if(editor.document.getText(range) == '') {
+					removeNoteAtRange(editorFileName, range)
+					continue
+				}
 
 				const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: value};
 
@@ -101,7 +121,36 @@ async function activate(context) {
 		}
 	}
 
-	triggerHighlightNotedLines()
+	const addNoteAtRange = function(fileName, range, note = '') {
+		const key = `${range.start.line}:${range.start.character}|${range.end.character}`
+
+		let notes = storage.get(fileName, {});
+		
+		notes[key] = note;
+
+		storage.update(fileName, notes)
+	}
+
+	const removeNoteAtRange = function(fileName, range) {
+		const key = `${range.start.line}:${range.start.character}|${range.end.character}`
+
+		let notes = storage.get(key, {})
+
+		delete notes[key]
+
+		storage.update(fileName, notes)
+	}
+
+	if(editor) {
+		triggerHighlightNoted()
+	}
+
+	vscode.window.onDidChangeActiveTextEditor(activeEditor => {
+		editor = activeEditor;
+		if (editor) {
+			triggerHighlightNoted();
+		}
+	}, null, context.subscriptions);
 
 	context.subscriptions.push(
 		disposable,

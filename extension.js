@@ -1,6 +1,8 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const _set = require('lodash.set');
+const _get = require('lodash.get');
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -11,15 +13,26 @@ const vscode = require('vscode');
 async function activate(context) {
 	console.log('Congratulations, your extension "sample" is now active!');
 
-	const storageStruct = {
-		'/Users/Mac': {
-			1: {
-				2: {
-					
-				}	
-			}
-		}
-	}
+	// const storageStruct = {
+	// 	'/Users/Mac': {
+	// 		1: // startLine
+	// 			{
+	// 				1: //endLine
+	// 					[
+	// 						{
+	// 							start: 1,
+	// 							end: 2,
+	// 							note: 'Test 1-2'
+	// 						},
+	// 						{
+	// 							start: 3,
+	// 							end: 5,
+	// 							note: 'Test 3-5'
+	// 						}
+	// 					]
+	// 			}
+	// 	}
+	// }
 	
 	const storage = context.workspaceState
 	let editor = vscode.window.activeTextEditor
@@ -36,7 +49,7 @@ async function activate(context) {
 		editor.setDecorations(noteDecorationType, []);
 	});
 
-	let disposable = vscode.commands.registerCommand('sample.noteSelection', function () {
+	let addNote = vscode.commands.registerCommand('sample.noteSelection', async function () {
 		if(!editor) {
 			return
 		}
@@ -46,29 +59,52 @@ async function activate(context) {
 		const selection = editor.selection
 
 		if(! selection.isSingleLine) {
+			vscode.window.showWarningMessage('Currently we only support note in single line.')
 			return
 		}
 
-		const message = (new Date()).toISOString()
+		const note = await vscode.window.showInputBox({
+			placeHolder: 'Write your note.'
+		})
 
-		addNoteAtRange(editorFileName, selection, message)
+		addNoteAtRange(editorFileName, selection, note)
 		
 		triggerHighlightNoted()
 	});
 
+	let removeNote = vscode.commands.registerCommand('sample.removeNote', function () {
+		if(!editor) {
+			return
+		}
+		
+		const editorFileName = editor.document.fileName
+
+		const selection = editor.selection
+
+		let startLine = selection?.start.line;
+		let endLine = selection?.end.line;
+
+		let notes = storage.get(editorFileName, {});
+		
+		let storedNotes = _get(notes, [startLine, endLine], []);
+
+		if(storedNotes != null) {
+			storedNotes.forEach((note) => {
+				const startPos = new vscode.Position(parseInt(startLine), parseInt(note?.start))
+				const endPos = new vscode.Position(parseInt(endLine), parseInt(note?.end))
+				const range = new vscode.Range(startPos, endPos)
+
+				if(range.contains(selection)) {
+					removeNoteAtRange(editorFileName, range)
+				}
+			})
+
+			triggerHighlightNoted()
+		}
+	});
+
 	let isObject = function(obj) {
 		return obj !== undefined && obj !== null && obj.constructor == Object && ! Array.isArray(obj);
-	}
-
-	let parseNotedLineKey = function(notedLineKey) {
-		let notedLineSplitted = notedLineKey.split(':')
-		let notedLineCharSplitted = notedLineSplitted[1]?.split('|')
-
-		return {
-			line: parseInt(notedLineSplitted[0]),
-			start: parseInt(notedLineCharSplitted[0]),
-			end: parseInt(notedLineCharSplitted[1]),
-		}
 	}
 
 	const noteDecorationType = vscode.window.createTextEditorDecorationType({
@@ -93,51 +129,106 @@ async function activate(context) {
 
 		const editorFileName = editor.document.fileName
 
-		let fileNotedLines = storage.get(editorFileName)
+		let storedNotes = storage.get(editorFileName)
 
 		const fileNotedDecorations = []
 
-		if(isObject(fileNotedLines) && Object.keys(fileNotedLines).length) {
-			for (const [key, value] of Object.entries(fileNotedLines)) {
-				let {line, start, end} = parseNotedLineKey(key)
+		if(isObject(storedNotes) && Object.keys(storedNotes).length) {
+			Object.keys(storedNotes).forEach((startOfLine) => {
+				let startObject = storedNotes[startOfLine]
 
-				const startPos = new vscode.Position(line, start)
-				const endPos = new vscode.Position(line, end)
-				const range = new vscode.Range(startPos, endPos)
+				Object.keys(startObject).forEach((endOfLine) => {
+					let noteObjects = startObject[endOfLine]
 
-				console.log(editor.document.getText(range))
+					if(noteObjects == null) {
+						return;
+					}
 
-				if(editor.document.getText(range) == '') {
-					removeNoteAtRange(editorFileName, range)
-					continue
-				}
-
-				const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: value};
-
-				fileNotedDecorations.push(decoration)
-			}
+					noteObjects.forEach((note) => {
+						const startPos = new vscode.Position(parseInt(startOfLine), parseInt(note?.start))
+						const endPos = new vscode.Position(parseInt(endOfLine), parseInt(note?.end))
+						const range = new vscode.Range(startPos, endPos)
+	
+						if(editor.document.getText(range) == '' || !editor.document.getText(range)) {
+							removeNoteAtRange(editorFileName, range)
+							return;
+						}
+	
+						const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: note?.note || 'Hover message'};
+	
+						fileNotedDecorations.push(decoration)
+					})
+				})
+			})
 
 			editor.setDecorations(noteDecorationType, fileNotedDecorations);
 		}
 	}
 
 	const addNoteAtRange = function(fileName, range, note = '') {
-		const key = `${range.start.line}:${range.start.character}|${range.end.character}`
+		if(range.isEmpty) {
+			return
+		}
+
+		let startLine = range?.start.line;
+		let endLine = range?.end.line;
 
 		let notes = storage.get(fileName, {});
 		
-		notes[key] = note;
+		let storedNotes = _get(notes, [startLine, endLine], []);
+
+		let resolvedOverlapNotes = storedNotes.map((item) => {
+			let storedRange = storedNoteToRange(startLine, endLine, item)
+
+			if(storedRange.isEmpty) {
+				return
+			}
+
+			if(range.intersection(storedRange)) {
+				return
+			}
+
+			return item
+		})
+
+		resolvedOverlapNotes.push({
+			start: range?.start.character,
+			end: range?.end.character,
+			note: note
+		});
+
+		_set(notes, [startLine, endLine], resolvedOverlapNotes.filter(i => i))
 
 		storage.update(fileName, notes)
 	}
 
+	const storedNoteToRange = function(startLine, endLine, storedNote) {
+		return new vscode.Range(
+			new vscode.Position(startLine, storedNote?.start),
+			new vscode.Position(endLine, storedNote?.end)
+		)
+	}
+
 	const removeNoteAtRange = function(fileName, range) {
-		const key = `${range.start.line}:${range.start.character}|${range.end.character}`
+		let notes = storage.get(fileName, {})
 
-		let notes = storage.get(key, {})
+		let startLine = range?.start.line;
+		let endLine = range?.end.line;
 
-		delete notes[key]
+		let storedNotes = _get(notes, [startLine, endLine], [])
 
+		let removeNoteIndex = storedNotes.findIndex((item) => {
+			return item.start == range?.start.character && item.end == range?.end.character
+		})
+
+		if(removeNoteIndex < 0) {
+			return
+		}
+		
+		storedNotes[removeNoteIndex] = undefined
+
+		_set(notes, [startLine, endLine], storedNotes.filter(i => i))
+		
 		storage.update(fileName, notes)
 	}
 
@@ -153,7 +244,8 @@ async function activate(context) {
 	}, null, context.subscriptions);
 
 	context.subscriptions.push(
-		disposable,
+		addNote,
+		removeNote,
 		clearStorage
 	);
 }

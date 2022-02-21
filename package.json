@@ -12,6 +12,7 @@
   "activationEvents": [
     "*",
     "onCommand:sample.noteSelection",
+    "onCommand:sample.removeNote",
     "onCommand:sample.clearStorage"
   ],
   "main": "./extension.js",
@@ -24,6 +25,10 @@
       {
         "command": "sample.clearStorage",
         "title": "Clear Storage"
+      },
+      {
+        "command": "sample.removeNote",
+        "title": "Remove Note!"
       }
     ],
     "menus": {
@@ -31,6 +36,10 @@
         {
           "when": "editorHasSelection",
           "command": "sample.noteSelection"
+        },
+        {
+          "when": "editorHasHoverProvider",
+          "command": "sample.removeNote"
         }
       ]
     }
@@ -52,6 +61,8 @@
     "typescript": "^4.5.4"
   },
   "dependencies": {
-    "axios": "^0.26.0"
+    "axios": "^0.26.0",
+    "lodash.get": "^4.4.2",
+    "lodash.set": "^4.3.2"
   }
 }

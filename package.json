@@ -1,7 +1,7 @@
 {
-  "name": "sample",
-  "displayName": "sample",
-  "description": "",
+  "name": "cote",
+  "displayName": "cote",
+  "description": "The simple vscode extension that supports note the code",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.64.0"
@@ -11,23 +11,22 @@
   ],
   "activationEvents": [
     "*",
-    "onCommand:sample.noteSelection",
-    "onCommand:sample.removeNote",
-    "onCommand:sample.clearStorage"
+    "onCommand:cote.noteSelection",
+    "onCommand:cote.removeNote"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "sample.noteSelection",
+        "command": "cote.noteSelection",
         "title": "Note Here!"
       },
       {
-        "command": "sample.clearStorage",
-        "title": "Clear Storage"
+        "command": "cote.clearStorage",
+        "title": "COTE: Clear Storage"
       },
       {
-        "command": "sample.removeNote",
+        "command": "cote.removeNote",
         "title": "Remove Note!"
       }
     ],
@@ -35,14 +34,24 @@
       "editor/context": [
         {
           "when": "editorHasSelection",
-          "command": "sample.noteSelection"
+          "command": "cote.noteSelection"
         },
         {
-          "when": "editorHasHoverProvider",
-          "command": "sample.removeNote"
+          "command": "cote.removeNote"
         }
       ]
-    }
+    },
+    "keybindings":[
+      {
+        "command": "cote.noteSelection",
+        "key": "cmd+alt+n",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "cote.removeNote",
+        "key": "cmd+alt+m"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",

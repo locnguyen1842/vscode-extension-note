@@ -11,23 +11,16 @@ const _get = require('lodash.get');
  * @param {vscode.ExtensionContext} context
  */
 async function activate(context) {
-	console.log('Congratulations, your extension "sample" is now active!');
-
 	// const storageStruct = {
-	// 	'/Users/Mac': {
+	// 	'/path/to/file/': {
 	// 		1: // startLine
 	// 			{
-	// 				1: //endLine
+	// 				1: //endLine - currently, startLine and endLine has same value (single line)
 	// 					[
 	// 						{
-	// 							start: 1,
-	// 							end: 2,
-	// 							note: 'Test 1-2'
-	// 						},
-	// 						{
-	// 							start: 3,
-	// 							end: 5,
-	// 							note: 'Test 3-5'
+	// 							start: 1, //start of position
+	// 							end: 2, //end of position
+	// 							note: 'Test 1-2' // note (Markdownable)
 	// 						}
 	// 					]
 	// 			}
@@ -37,7 +30,25 @@ async function activate(context) {
 	const storage = context.workspaceState
 	let editor = vscode.window.activeTextEditor
 
-	let clearStorage = vscode.commands.registerCommand('sample.clearStorage', function () {
+	const isObject = function(obj) {
+		return obj !== undefined && obj !== null && obj.constructor == Object && ! Array.isArray(obj)
+	}
+
+	const noteDecorationType = vscode.window.createTextEditorDecorationType({
+		borderRadius: '3px',
+		borderWidth: '0.5px',
+		borderStyle: 'groove',
+		overviewRulerColor: 'gray',
+		overviewRulerLane: vscode.OverviewRulerLane.Right,
+		light: {
+			borderColor: '#bcc6d6',
+		},
+		dark: {
+			borderColor: '#bcc6d6',
+		}
+	})
+
+	let clearStorage = vscode.commands.registerCommand('cote.clearStorage', function () {
 		storage.keys().forEach((key) => {
 			storage.update(key, undefined)
 		})
@@ -46,10 +57,10 @@ async function activate(context) {
 			return
 		}
 
-		editor.setDecorations(noteDecorationType, []);
-	});
+		editor.setDecorations(noteDecorationType, [])
+	})
 
-	let addNote = vscode.commands.registerCommand('sample.noteSelection', async function () {
+	let addNote = vscode.commands.registerCommand('cote.noteSelection', async function () {
 		if(!editor) {
 			return
 		}
@@ -67,12 +78,16 @@ async function activate(context) {
 			placeHolder: 'Write your note.'
 		})
 
-		addNoteAtRange(editorFileName, selection, note)
+		if(typeof note === 'undefined') {
+			return
+		}
 		
-		triggerHighlightNoted()
-	});
+		addNoteAtRange(editorFileName, selection, note)
 
-	let removeNote = vscode.commands.registerCommand('sample.removeNote', function () {
+		triggerHighlightNoted()
+	})
+
+	let removeNote = vscode.commands.registerCommand('cote.removeNote', function () {
 		if(!editor) {
 			return
 		}
@@ -81,12 +96,12 @@ async function activate(context) {
 
 		const selection = editor.selection
 
-		let startLine = selection?.start.line;
-		let endLine = selection?.end.line;
+		let startLine = selection?.start.line
+		let endLine = selection?.end.line
 
-		let notes = storage.get(editorFileName, {});
+		let notes = storage.get(editorFileName, {})
 		
-		let storedNotes = _get(notes, [startLine, endLine], []);
+		let storedNotes = _get(notes, [startLine, endLine], [])
 
 		if(storedNotes != null) {
 			storedNotes.forEach((note) => {
@@ -101,30 +116,11 @@ async function activate(context) {
 
 			triggerHighlightNoted()
 		}
-	});
-
-	let isObject = function(obj) {
-		return obj !== undefined && obj !== null && obj.constructor == Object && ! Array.isArray(obj);
-	}
-
-	const noteDecorationType = vscode.window.createTextEditorDecorationType({
-		borderWidth: '1px',
-		borderStyle: 'solid',
-		overviewRulerColor: 'blue',
-		overviewRulerLane: vscode.OverviewRulerLane.Right,
-		light: {
-			// this color will be used in light color themes
-			borderColor: 'darkblue'
-		},
-		dark: {
-			// this color will be used in dark color themes
-			borderColor: 'lightblue'
-		}
 	})
 
 	const triggerHighlightNoted = function() {
 		if(!editor) {
-			return;
+			return
 		}
 
 		const editorFileName = editor.document.fileName
@@ -141,7 +137,7 @@ async function activate(context) {
 					let noteObjects = startObject[endOfLine]
 
 					if(noteObjects == null) {
-						return;
+						return
 					}
 
 					noteObjects.forEach((note) => {
@@ -151,17 +147,21 @@ async function activate(context) {
 	
 						if(editor.document.getText(range) == '' || !editor.document.getText(range)) {
 							removeNoteAtRange(editorFileName, range)
-							return;
+							return
+						}
+
+						if(! note?.note) {
+							return
 						}
 	
-						const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: note?.note || 'Hover message'};
+						const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: note?.note}
 	
 						fileNotedDecorations.push(decoration)
 					})
 				})
 			})
 
-			editor.setDecorations(noteDecorationType, fileNotedDecorations);
+			editor.setDecorations(noteDecorationType, fileNotedDecorations)
 		}
 	}
 
@@ -170,12 +170,12 @@ async function activate(context) {
 			return
 		}
 
-		let startLine = range?.start.line;
-		let endLine = range?.end.line;
+		let startLine = range?.start.line
+		let endLine = range?.end.line
 
-		let notes = storage.get(fileName, {});
+		let notes = storage.get(fileName, {})
 		
-		let storedNotes = _get(notes, [startLine, endLine], []);
+		let storedNotes = _get(notes, [startLine, endLine], [])
 
 		let resolvedOverlapNotes = storedNotes.map((item) => {
 			let storedRange = storedNoteToRange(startLine, endLine, item)
@@ -195,7 +195,7 @@ async function activate(context) {
 			start: range?.start.character,
 			end: range?.end.character,
 			note: note
-		});
+		})
 
 		_set(notes, [startLine, endLine], resolvedOverlapNotes.filter(i => i))
 
@@ -212,8 +212,8 @@ async function activate(context) {
 	const removeNoteAtRange = function(fileName, range) {
 		let notes = storage.get(fileName, {})
 
-		let startLine = range?.start.line;
-		let endLine = range?.end.line;
+		let startLine = range?.start.line
+		let endLine = range?.end.line
 
 		let storedNotes = _get(notes, [startLine, endLine], [])
 
@@ -237,17 +237,16 @@ async function activate(context) {
 	}
 
 	vscode.window.onDidChangeActiveTextEditor(activeEditor => {
-		editor = activeEditor;
+		editor = activeEditor
 		if (editor) {
-			triggerHighlightNoted();
+			triggerHighlightNoted()
 		}
-	}, null, context.subscriptions);
+	}, null, context.subscriptions)
 
 	context.subscriptions.push(
 		addNote,
-		removeNote,
-		clearStorage
-	);
+		removeNote
+	)
 }
 
 // this method is called when your extension is deactivated

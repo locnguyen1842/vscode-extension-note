@@ -1,3 +1,6 @@
+## Extension Link
+https://marketplace.visualstudio.com/items?itemName=locnguyen1842.cote
+
 ## DEMO
 
 [![DEMO](https://img.youtube.com/vi/Yn3tn4zL4Yg/0.jpg)](https://www.youtube.com/watch?v=Yn3tn4zL4Yg)
